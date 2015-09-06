@@ -6,6 +6,7 @@ from datetime import datetime
 from input import tap_key, PressKey, ReleaseKey
 import json
 import math
+import random
 import struct
 import sys
 import time
@@ -14,9 +15,7 @@ import websockets
 import win32com.client
 
 
-CONF = {
-#    'protocol': 'http',
-#    'host': 'localhost:9000'
+BLOTRE_CONF = {
 }
 
 # Tag to listen to on Blotre for player 1
@@ -56,6 +55,9 @@ current_inputs = {
 
 loop = asyncio.get_event_loop()
 
+def debug(*x):
+    print(*x)
+    sys.stdout.flush()
 
 def hex_to_rgb(hex):
     """Convert a hex string to rgb."""
@@ -77,7 +79,7 @@ def hsv_to_control(hsv):
     sector = math.ceil(hsv[0] / 0.125)
     return CONTROLS[int((sector % 7) / 2)]
 
-def reset_game(shell):
+def reset_game():
     """Trigger a game reset"""
     tap_key(0x3C)
 
@@ -86,10 +88,20 @@ def select_new_mode():
     for x in range(random.randint(0, 5)):
         tap_key(0x3b)
 
+def start_new_game():
+    """Trigger a game reset"""
+    select_new_mode()
+    reset_game()
 
-def debug(*x):
-    print(*x)
-    sys.stdout.flush()
+def scheduled_reset():
+    start_new_game()
+    loop.call_later(RESET_DELAY, scheduled_reset)
+
+def check_timeout():
+    global last_input_time
+    if (datetime.now() - last_input_time).total_seconds() > TIMEOUT_DELAY:
+        start_new_game()
+    loop.call_later(TIMEOUT_DELAY, check_timeout)
 
 def clamp(lower, upper, x):
     return max(lower, min(upper, x))
@@ -154,7 +166,7 @@ def process_message(msg):
         pass
 
 @asyncio.coroutine
-def hello(shell, client):
+def hello(client):
     debug('opened socket')
     websocket = yield from websockets.connect(client.get_websocket_url())
     yield from subscribe_tag(websocket, PLAYER1_TAG)
@@ -168,24 +180,12 @@ def hello(shell, client):
     yield from websocket.close()
 
 
-client = blotre.Blotre({}, {}, CONF)
+client = blotre.Blotre({}, {}, BLOTRE_CONF)
 
 shell = win32com.client.Dispatch("WScript.Shell")
 shell.AppActivate("Stella")
 
-
-def scheduled_reset():
-    reset_game(shell)
-    loop.call_later(RESET_DELAY, scheduled_reset)
-
-def check_timeout():
-    global last_input_time
-    if (datetime.now() - last_input_time).total_seconds() > TIMEOUT_DELAY:
-        reset_game(shell)
-    loop.call_later(TIMEOUT_DELAY, check_timeout)
-
-
 scheduled_reset()
 loop.call_later(TIMEOUT_DELAY, check_timeout)
 
-loop.run_until_complete(hello(shell, client))
+loop.run_until_complete(hello(client))
