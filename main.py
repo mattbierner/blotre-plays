@@ -14,40 +14,44 @@ import threading
 import websockets
 import win32com.client
 
-
-BLOTRE_CONF = {
-}
+# Extra config info used to get Blot're websocket address.
+BLOTRE_CONF = { }
 
 # Tag to listen to on Blotre for player 1
-PLAYER1_TAG = "player1"
+PLAYER1_TAG = "#player1"
 
 # Tag to listen to on Blotre for player 2
-PLAYER2_TAG = "player2"
+PLAYER2_TAG = "#player2"
 
 CONTROLS = ["up", "left", "down", "right"]
 
+# Maximum length of time of a joystick button press 
 MAX_PRESS = 2
+
+# Minimum length of time of a joystick button press 
 MIN_PRESS = 0.2
 
+# Action to key mappings for player1
 PLAYER1 = {
-    "up": 0x11,
-    "right": 0x20,
-    "down": 0x1f,
-    "left": 0x1e,
-    "fire": 0x12 }
+    "up": 0x11,     # w
+    "right": 0x20,  # d
+    "down": 0x1f,   # s
+    "left": 0x1e,   # a
+    "fire": 0x12    # e
+}  
 
+# Action to key mappings for player2
 PLAYER2 = {
-    "up": 0x15,
-    "right": 0x24,
-    "down": 0x23,
-    "left": 0x22,
-    "fire": 0x16 }
+    "up": 0x15,     # y
+    "right": 0x24,  # j
+    "down": 0x23,   # h
+    "left": 0x22,   # g
+    "fire": 0x16    # u
+}
 
+# How long each round should last in seconds.
+# Requires that Combat rom be modded to disable timer.
 RESET_DELAY = 60 * 5
-
-TIMEOUT_DELAY = 45
-
-last_input_time = datetime.now()
 
 current_inputs = {
     'player1': { 'index': 0, 'value': 0 },
@@ -79,6 +83,15 @@ def hsv_to_control(hsv):
     sector = math.ceil(hsv[0] / 0.125)
     return CONTROLS[int((sector % 7) / 2)]
 
+def hex_to_action(color):
+    hsv = hex_to_hsv(color)
+    input = hsv_to_control(hsv)
+    if input == 'fire':
+        return (0.2, 'fire')
+    else:
+        return ((MAX_PRESS - MIN_PRESS) * hsv[1] + MIN_PRESS, input)
+
+
 def reset_game():
     """Trigger a game reset"""
     tap_key(0x3C)
@@ -97,14 +110,6 @@ def scheduled_reset():
     start_new_game()
     loop.call_later(RESET_DELAY, scheduled_reset)
 
-def check_timeout():
-    global last_input_time
-    if (datetime.now() - last_input_time).total_seconds() > TIMEOUT_DELAY:
-        start_new_game()
-    loop.call_later(TIMEOUT_DELAY, check_timeout)
-
-def clamp(lower, upper, x):
-    return max(lower, min(upper, x))
 
 def try_release_key(player, key, target_index):
     global current_inputs
@@ -126,47 +131,37 @@ def enter_input(player, controls, action):
     current['value'] = key
     loop.call_later(delay, try_release_key, player, key, index)
 
-def subscribe_tag(websocket, tagname):
-    yield from websocket.send(json.dumps({
-        'type': 'SubscribeCollection',
-        'to': "#" + tagname
-    }))
-
-def color_to_action(color):
-    hsv = hex_to_hsv(color)
-    input = hsv_to_control(hsv)
-    if input == 'fire':
-        return (0.2, 'fire')
-    else:
-        return (clamp(MIN_PRESS, MAX_PRESS, MAX_PRESS * hsv[1]), input)
-
-def on_player1_input(color):
-    global last_input_time
-    last_input_time = datetime.now()
-    action = color_to_action(color)
-    enter_input('player1', PLAYER1, action)
-
-def on_player2_input(color):
-    global last_input_time
-    last_input_time = datetime.now()
-    action = color_to_action(color)
-    enter_input('player2', PLAYER2, action)
+def on_player_input(name, controls, color):
+    action = hex_to_action(color)
+    enter_input(name, controls, action)
 
 def process_message(msg):
     try:
         data = json.loads(msg)
-        if data['type'] == "StatusUpdated":
+        color = None
+        if data['type'] == "StatusUpdated": 
             color = data['status']['color']
-            if data['source'] == '#' + PLAYER1_TAG:
-                return on_player1_input(color)
-            elif data['source'] == '#' + PLAYER2_TAG:
-                return on_player2_input(color)
+        elif data['type'] == "ChildAdded":
+            color = data['child']['status']['color']
+        else:
+            return
+        
+        if data['source'] == PLAYER1_TAG:
+            return on_player_input('player1', PLAYER1, color)
+        elif data['source'] == PLAYER2_TAG:
+            return on_player_input('player2', PLAYER2, color)
     except Exception as e:
         debug(e)
         pass
 
+def subscribe_tag(websocket, tagname):
+    yield from websocket.send(json.dumps({
+        'type': 'SubscribeCollection',
+        'to': tagname
+    }))
+
 @asyncio.coroutine
-def hello(client):
+def open_socket(client):
     debug('opened socket')
     websocket = yield from websockets.connect(client.get_websocket_url())
     yield from subscribe_tag(websocket, PLAYER1_TAG)
@@ -180,12 +175,10 @@ def hello(client):
     yield from websocket.close()
 
 
-client = blotre.Blotre({}, {}, BLOTRE_CONF)
-
 shell = win32com.client.Dispatch("WScript.Shell")
 shell.AppActivate("Stella")
 
 scheduled_reset()
-loop.call_later(TIMEOUT_DELAY, check_timeout)
 
-loop.run_until_complete(hello(client))
+client = blotre.Blotre({}, {}, BLOTRE_CONF)
+loop.run_until_complete(open_socket(client))
