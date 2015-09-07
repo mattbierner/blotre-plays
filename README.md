@@ -10,7 +10,7 @@ Player input is provided using two tags: `#player1` and `#player2`. Color status
 * Saturation controls the duration of input. More saturation = longer button press.
 
 ## Resets
-Automatically resets the game every five minutes. Resets also randomly select a new game mode.
+Automatically resets the game every ten minutes. Resets also randomly select a new game mode.
 
 Edit your Combat rom to disable the timer, just make the following change:
 
