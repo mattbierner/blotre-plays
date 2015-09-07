@@ -8,11 +8,11 @@ I've set up a [live stream of the game][stream]. Anyone can join and play, altho
 ## Joining
 Player input is provided using two tags: `#player1` and `#player2`. To play, create a Blot're account and add one of these tags to any stream.
 
-![]
+![](https://raw.github.com/mattbierner/blotre-plays/master/documentation/add-tag-1.png)
 
-![]
+![](https://raw.github.com/mattbierner/blotre-plays/master/documentation/add-tag-2.png)
 
-![]
+![](https://raw.github.com/mattbierner/blotre-plays/master/documentation/add-tag-3.png)
 
 Any status changes you make to those streams will now be treated as player input.
 
@@ -29,7 +29,7 @@ Automatically resets the game every ten minutes. Resets also randomly select a n
 
 
 # Running
-The program is written in Python 3. Uses [Blot're.py][blotre-py] to subscribe to the Blot're tag collections and [websockets][] to receive real time updates.
+The program is written in Python 3. Uses [Blot're.py][blotre-py] to subscribe to the Blot're tag collections and [websockets][] to receive real time status updates for the tags.
 
 Edit your Combat rom to disable the timer, just make the following change:
 
