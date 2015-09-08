@@ -25,7 +25,7 @@ Color status updates are converted to HSV values and translated into in-game com
 
 
 ### Resets
-Automatically resets the game every ten minutes. Resets also randomly select a new game mode.
+Automatically resets the game every 30 minutes. Resets also randomly select a new game mode.
 
 
 # Running

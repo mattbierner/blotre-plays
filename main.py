@@ -51,7 +51,7 @@ PLAYER2 = {
 
 # How long each round should last in seconds.
 # Requires that Combat rom be modded to disable timer.
-RESET_DELAY = 60 * 10
+RESET_DELAY = 60 * 30
 
 current_inputs = {
     'player1': { 'index': 0, 'value': 0 },
